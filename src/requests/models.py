@@ -1036,6 +1036,9 @@ class Response:
         """Content of the response, in bytes."""
 
         if self._content is False:
+            # If a previous read raised, replay the same error
+            if hasattr(self, '_content_error'):
+                raise self._content_error
             # Read the contents.
             if self._content_consumed:
                 raise RuntimeError("The content for this response was already consumed")
@@ -1043,7 +1046,11 @@ class Response:
             if self.status_code == 0 or self.raw is None:
                 self._content = None
             else:
-                self._content = b"".join(self.iter_content(CONTENT_CHUNK_SIZE)) or b""
+                try:
+                    self._content = b"".join(self.iter_content(CONTENT_CHUNK_SIZE)) or b""
+                except Exception as e:
+                    self._content_error = e
+                    raise
 
         self._content_consumed = True
         # don't need to release the connection; that's been handled by urllib3
